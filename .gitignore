@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+.scratch/
+backend/data/
+__pycache__/
+.venv/
+node_modules/
+frontend/dist/
