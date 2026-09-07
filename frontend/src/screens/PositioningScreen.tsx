@@ -4,9 +4,13 @@ import { lockLandscape } from '../camera/stream'
 import { useIsPortrait } from '../camera/useIsPortrait'
 import { usePoseTracking } from '../camera/usePoseTracking'
 import type { TrackingPhase } from '../camera/usePoseTracking'
+import type { LandmarkSocket } from '../net/socket'
+import { toWireFrame } from '../pose/wire'
 
 interface PositioningScreenProps {
   stream: MediaStream
+  /** Frames stream from the moment the Connection opens, before any Set. */
+  socket: LandmarkSocket
   onStart: (stream: MediaStream) => void
 }
 
@@ -14,11 +18,13 @@ interface PositioningScreenProps {
  * The mirrored preview with the skeleton over it, plus the guide that tells the
  * user what is not in frame yet. Start unlocks only once the guard passes.
  */
-export function PositioningScreen({ stream, onStart }: PositioningScreenProps) {
+export function PositioningScreen({ stream, socket, onStart }: PositioningScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const portrait = useIsPortrait()
-  const { phase, error, guard } = usePoseTracking(videoRef, canvasRef)
+  const { phase, error, guard } = usePoseTracking(videoRef, canvasRef, (landmarks, t) => {
+    socket.sendFrame(toWireFrame(landmarks, Math.round(t)))
+  })
 
   useEffect(() => {
     const video = videoRef.current

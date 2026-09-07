@@ -1,19 +1,122 @@
+import { useEffect, useRef, useState } from 'react'
+
+import { playHighTone } from '../audio/tones'
+import { usePoseTracking } from '../camera/usePoseTracking'
+import type { LandmarkSocket, SummaryMessage } from '../net/socket'
+import { toWireFrame } from '../pose/wire'
+import { loadMuted, saveMuted } from '../prefs/mute'
+
 interface LiveScreenProps {
-  onStop: () => void
+  stream: MediaStream
+  socket: LandmarkSocket
+  /** The Set stopped and the backend summarised it. */
+  onFinished: (summary: SummaryMessage) => void
 }
 
+const VIBRATE_MS = 50
+
 /**
- * Placeholder for the set in progress. The counter, the connection and the
- * summary arrive with the live-counting ticket; this only proves the seam.
+ * The Set in progress: the count, and the feedback that reaches a user who is
+ * face-down on the floor and cannot read anything -- a tone and a buzz per
+ * counted Rep. Every number here comes from the backend; the phone counts
+ * nothing of its own (docs/adr/0002).
  */
-export function LiveScreen({ onStop }: LiveScreenProps) {
+export function LiveScreen({ stream, socket, onFinished }: LiveScreenProps) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [reps, setReps] = useState(0)
+  const [rejected, setRejected] = useState(0)
+  const [phase, setPhase] = useState('IDLE')
+  const [elbowAngle, setElbowAngle] = useState<number | null>(null)
+  const [muted, setMuted] = useState(loadMuted)
+  // The message listener is set up once; it reads the live choice from a ref.
+  const silent = useRef(muted)
+  useEffect(() => {
+    silent.current = muted
+  }, [muted])
+
+  usePoseTracking(videoRef, canvasRef, (landmarks, timestampMs) => {
+    socket.sendFrame(toWireFrame(landmarks, Math.round(timestampMs)))
+  })
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    video.srcObject = stream
+    void video.play()?.catch(() => {
+      // Already playing from the positioning screen on most browsers.
+    })
+    return () => {
+      video.srcObject = null
+    }
+  }, [stream])
+
+  useEffect(() => {
+    const stopListening = socket.listen((message) => {
+      if (message.type === 'state') {
+        setReps(message.reps)
+        setRejected(message.rejected)
+        setPhase(message.phase)
+        setElbowAngle(message.elbow_angle)
+        return
+      }
+      if (message.type === 'rep' && message.counted) {
+        if (!silent.current) playHighTone()
+        navigator.vibrate?.(VIBRATE_MS)
+        return
+      }
+      if (message.type === 'summary') onFinished(message)
+    })
+
+    socket.start(newSetId())
+    return stopListening
+  }, [socket, onFinished])
+
+  const toggleMute = () => {
+    const next = !muted
+    setMuted(next)
+    saveMuted(next)
+  }
+
   return (
-    <main className="screen screen--prose">
-      <h1>Set in progress</h1>
-      <p>Counting is not wired up yet. This screen fills in with the next ticket.</p>
-      <button type="button" onClick={onStop}>
-        Stop
-      </button>
+    <main className="screen screen--stage">
+      <div className="stage">
+        {/* Mirrored for the user; the landmarker reads the unmirrored frame. */}
+        <video ref={videoRef} className="stage__video" playsInline muted autoPlay />
+        <canvas ref={canvasRef} className="stage__overlay" />
+
+        <p className="count" aria-hidden="true">
+          {reps}
+        </p>
+        <p className="visually-hidden" aria-live="polite">
+          {reps} {reps === 1 ? 'rep' : 'reps'}
+        </p>
+        <p className="tally">{rejected} rejected</p>
+        <p className="readout">{readout(phase, elbowAngle)}</p>
+      </div>
+
+      <div className="guide">
+        <button type="button" onClick={toggleMute} aria-pressed={muted}>
+          {muted ? 'Unmute' : 'Mute'}
+        </button>
+        <button type="button" onClick={() => socket.reset()}>
+          Reset
+        </button>
+        <button type="button" onClick={() => socket.stop()}>
+          Stop
+        </button>
+      </div>
     </main>
   )
+}
+
+/** "DOWN 82°" -- the Phase and Elbow Angle the backend last reported. */
+function readout(phase: string, elbowAngle: number | null): string {
+  if (elbowAngle === null) return phase
+  return `${phase} ${Math.round(elbowAngle)}°`
+}
+
+function newSetId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `set-${Date.now()}`
 }

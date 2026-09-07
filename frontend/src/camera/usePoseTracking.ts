@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 
 import { clearOverlay, drawSkeleton } from '../pose/draw'
+import type { PoseLandmark } from '../pose/wire'
 import { LANDMARK_COUNT, positioningGuard } from '../pose/guard'
 import type { GuardResult } from '../pose/guard'
 import type { Delegate, PoseTracker } from '../pose/landmarker'
@@ -29,15 +30,24 @@ export interface PoseTracking {
 
 const NOT_IN_FRAME: GuardResult = { ready: false, missing: [] }
 
+/** Called with every complete detection, for whoever wants to stream Frames. */
+export type LandmarksListener = (landmarks: PoseLandmark[], timestampMs: number) => void
+
 export function usePoseTracking(
   videoRef: RefObject<HTMLVideoElement | null>,
   canvasRef: RefObject<HTMLCanvasElement | null>,
+  onLandmarks?: LandmarksListener,
 ): PoseTracking {
   const [phase, setPhase] = useState<TrackingPhase>('starting')
   const [error, setError] = useState<string | null>(null)
   const [delegate, setDelegate] = useState<Delegate | null>(null)
   const [guard, setGuard] = useState<GuardResult>(NOT_IN_FRAME)
   const lastMissing = useRef<string>('\u0000')
+  // Held in a ref so a new callback each render never restarts the landmarker.
+  const listener = useRef<LandmarksListener | undefined>(onLandmarks)
+  useEffect(() => {
+    listener.current = onLandmarks
+  })
 
   useEffect(() => {
     let stopped = false
@@ -91,6 +101,7 @@ export function usePoseTracking(
       }
 
       drawSkeleton(context, landmarks)
+      listener.current?.(landmarks, timestamp)
       setPhase('tracking')
       publishGuard(positioningGuard(landmarks.map((landmark) => landmark.visibility ?? 0)))
     }

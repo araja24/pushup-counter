@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { apiBaseUrl } from './urls'
+import { apiBaseUrl, frameSocketUrl } from './urls'
 
 describe('apiBaseUrl', () => {
   it('serves the API from the same origin as the page', () => {
@@ -28,5 +28,19 @@ describe('apiBaseUrl', () => {
     const location = { protocol: 'http:', host: '192.168.1.20:8000' }
 
     expect(apiBaseUrl(location).ws).toBe('ws://192.168.1.20:8000')
+  })
+})
+
+describe('frameSocketUrl', () => {
+  it('is a secure socket on a page served over https', () => {
+    expect(frameSocketUrl({ protocol: 'https:', host: 'pushform.onrender.com' })).toBe(
+      'wss://pushform.onrender.com/ws',
+    )
+  })
+
+  it('is a plain socket on the http dev server', () => {
+    expect(frameSocketUrl({ protocol: 'http:', host: 'localhost:5173' })).toBe(
+      'ws://localhost:5173/ws',
+    )
   })
 })

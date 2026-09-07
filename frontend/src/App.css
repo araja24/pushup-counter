@@ -117,3 +117,69 @@ button:disabled {
   font-weight: 600;
   background: #0e1412;
 }
+
+/* Live counter */
+
+/* Readable from the floor, two metres away: never below 120px, and bigger on
+   a roomier screen. The stage is landscape by the time a set starts. */
+.count {
+  position: absolute;
+  inset: auto auto 0.5rem 1rem;
+  margin: 0;
+  font-size: max(120px, 26vmin);
+  font-weight: 700;
+  line-height: 0.9;
+  color: #f2f5f4;
+  text-shadow: 0 2px 12px rgb(0 0 0 / 70%);
+}
+
+.count--summary {
+  position: static;
+  font-size: max(120px, 20vmin);
+}
+
+.tally {
+  position: absolute;
+  inset: auto 1rem 0.75rem auto;
+  margin: 0;
+  font-size: 1rem;
+  color: #b9c7c2;
+  text-shadow: 0 1px 6px rgb(0 0 0 / 70%);
+}
+
+.readout {
+  position: absolute;
+  inset: 0.75rem 1rem auto auto;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+  color: #9fb3ac;
+  text-shadow: 0 1px 6px rgb(0 0 0 / 70%);
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.figures dt {
+  color: #9fb3ac;
+}
+
+.figures dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

@@ -24,3 +24,8 @@ export function apiBaseUrl(location: PageLocation): ApiBaseUrl {
     ws: `${secure ? 'wss' : 'ws'}://${location.host}`,
   }
 }
+
+/** Where the landmark Connection lives: the page's own origin, over WebSocket. */
+export function frameSocketUrl(location: PageLocation): string {
+  return `${apiBaseUrl(location).ws}/ws`
+}
