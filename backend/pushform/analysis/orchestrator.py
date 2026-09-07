@@ -17,10 +17,30 @@ from pushform.analysis import geometry
 from pushform.analysis.config import DEFAULT_CONFIG, AnalysisConfig
 from pushform.analysis.events import Event, Phase, PhaseChanged, RepCompleted, State, Summary
 from pushform.analysis.filters import MedianFilter, TrackedSideSelector
-from pushform.analysis.geometry import Frame, Side
+from pushform.analysis.geometry import Frame, Landmarks, Side
 from pushform.analysis.phase import PhaseMachine
 
 __all__ = ["Orchestrator"]
+
+WIRE_SHAPE = '{"t": milliseconds, "lm": [[x, y, z, visibility]] * 33}'
+
+
+def _read(frame: Frame) -> tuple[int, Landmarks]:
+    """Pull the timestamp and Landmarks out of a wire-shape Frame.
+
+    Frames come off a network, so this is where a malformed one is turned into
+    a single named failure rather than a KeyError or an IndexError from deep
+    inside the geometry.
+    """
+    try:
+        t_ms = int(frame["t"])
+        landmarks = frame["lm"]
+        count = len(landmarks)
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(f"Frame must be {WIRE_SHAPE}: {error}") from error
+    if count != geometry.LANDMARK_COUNT:
+        raise ValueError(f"Frame must be {WIRE_SHAPE}: got {count} landmarks")
+    return t_ms, landmarks
 
 
 @dataclass
@@ -82,14 +102,18 @@ class Orchestrator:
     def process(self, frame: Frame) -> list[Event]:
         """Take one wire-shape Frame and return the events it caused.
 
-        Frames arriving outside a Set are ignored: no events, and the State
-        keeps reporting IDLE.
+        Frames arriving outside a Set are ignored without being read: no
+        events, and the State keeps reporting IDLE.
+
+        Raises:
+            ValueError: The Frame is not in wire shape. One error for every
+                malformed Frame, so a caller reading from the network has a
+                single thing to catch and report.
         """
         if not self._running:
             return []
 
-        t_ms = int(frame["t"])
-        landmarks = frame["lm"]
+        t_ms, landmarks = _read(frame)
         self._side = self._sides.update(landmarks)
         self._tracking = self._sides.is_tracked(self._side)
         self._hip_angle = geometry.hip_angle(landmarks, self._side)

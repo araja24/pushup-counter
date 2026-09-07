@@ -134,3 +134,43 @@ def test_angles_stay_inside_the_geometric_range_even_with_heavy_noise():
 
     assert all(0.0 < angle < 180.0 for angle in angles)
     assert not any(math.isnan(angle) for angle in angles)
+
+
+@pytest.mark.parametrize("deviation", [0.0, 12.0, -12.0])
+def test_facing_is_a_pure_horizontal_mirror(deviation):
+    facing_right = synthetic.generate_frames(
+        cycles=1, facing="right", hip_deviation_deg=deviation
+    )[0]["lm"]
+    facing_left = synthetic.generate_frames(
+        cycles=1, facing="left", hip_deviation_deg=deviation
+    )[0]["lm"]
+
+    for right, left in zip(facing_right, facing_left, strict=True):
+        assert left[0] == pytest.approx(1.0 - right[0])
+        assert left[1] == pytest.approx(right[1])
+
+
+@pytest.mark.parametrize("deviation", [12.0, -12.0])
+def test_the_body_line_bends_the_same_way_whichever_way_the_body_faces(deviation):
+    def leg_drop(frames):
+        landmarks = frames[0]["lm"]
+        return landmarks[geometry.ANKLE["left"]][1] - landmarks[geometry.HIP["left"]][1]
+
+    facing_right = leg_drop(
+        synthetic.generate_frames(cycles=1, facing="right", hip_deviation_deg=deviation)
+    )
+    facing_left = leg_drop(
+        synthetic.generate_frames(cycles=1, facing="left", hip_deviation_deg=deviation)
+    )
+
+    assert math.copysign(1.0, facing_right) == math.copysign(1.0, facing_left)
+    assert facing_right == pytest.approx(facing_left)
+
+
+def test_a_positive_hip_deviation_sags_the_hips_below_the_body_line():
+    sag = synthetic.generate_frames(cycles=1, hip_deviation_deg=12.0)[0]["lm"]
+    pike = synthetic.generate_frames(cycles=1, hip_deviation_deg=-12.0)[0]["lm"]
+
+    # y grows downwards, so sagging hips leave the ankle above the hip.
+    assert sag[geometry.ANKLE["left"]][1] < sag[geometry.HIP["left"]][1]
+    assert pike[geometry.ANKLE["left"]][1] > pike[geometry.HIP["left"]][1]

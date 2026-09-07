@@ -118,3 +118,25 @@ def test_the_state_snapshot_reports_the_current_frame(run_set):
     assert state.aligned is None
     assert state.stalled is False
     assert state.rejected == 0
+
+
+@pytest.mark.parametrize(
+    "frame",
+    [
+        {"t": 0},
+        {"lm": [[0.0, 0.0, 0.0, 0.9]] * 33},
+        {"t": "soon", "lm": [[0.0, 0.0, 0.0, 0.9]] * 33},
+        {"t": 0, "lm": [[0.0, 0.0, 0.0, 0.9]] * 5},
+        {"t": 0, "lm": None},
+    ],
+)
+def test_a_malformed_frame_is_refused_with_one_clear_error(frame):
+    orchestrator = Orchestrator()
+    orchestrator.start("set-1")
+
+    with pytest.raises(ValueError, match="Frame"):
+        orchestrator.process(frame)
+
+
+def test_a_malformed_frame_outside_a_set_is_simply_ignored():
+    assert Orchestrator().process({"nonsense": True}) == []

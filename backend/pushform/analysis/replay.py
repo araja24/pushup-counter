@@ -37,23 +37,42 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"{args.recording} is not valid JSON: {error}", file=sys.stderr)
         return 1
 
-    for line in replay(recording):
+    try:
+        lines = replay(recording)
+    except ValueError as error:
+        print(f"malformed recording {args.recording}: {error}", file=sys.stderr)
+        return 1
+
+    for line in lines:
         print(line)
     return 0
 
 
-def replay(recording: dict) -> list[str]:
-    """Run a Recording through a Set and describe every event it produced."""
+def replay(recording: object) -> list[str]:
+    """Run a Recording through a Set and describe every event it produced.
+
+    Raises:
+        ValueError: The Recording is not an envelope of wire-shape Frames.
+    """
+    frames, label = _unpack(recording)
     orchestrator = Orchestrator()
-    orchestrator.start(recording.get("label") or "replay")
+    orchestrator.start(label)
 
     lines = []
-    for frame in recording["frames"]:
+    for frame in frames:
         lines.extend(describe(event) for event in orchestrator.process(frame))
     (summary,) = orchestrator.stop()
     lines.append(describe(summary))
     lines.append(f"Counted reps: {summary.reps}")
     return lines
+
+
+def _unpack(recording: object) -> tuple[list, str]:
+    """The Frames and Set label of a Recording, or a ValueError naming the shape."""
+    if not isinstance(recording, dict) or not isinstance(recording.get("frames"), list):
+        raise ValueError('expected {"label": string or null, "frames": [frame, ...]}')
+    label = recording.get("label")
+    return recording["frames"], label if isinstance(label, str) and label else "replay"
 
 
 def describe(event: Event) -> str:

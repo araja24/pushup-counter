@@ -24,7 +24,7 @@ from random import Random
 from typing import Literal, TypeAlias
 
 from pushform.analysis import geometry
-from pushform.analysis.geometry import Frame, Side
+from pushform.analysis.geometry import LANDMARK_COUNT, Frame, Side
 
 __all__ = ["Frame", "StartPhase", "VisibilityOverride", "frames_from_angles", "generate_frames"]
 
@@ -32,8 +32,6 @@ StartPhase = Literal["up", "down"]
 
 VisibilityOverride: TypeAlias = Callable[[int], dict[int, float] | None]
 """Frame index -> ``{landmark index: visibility}`` to override, or ``None``."""
-
-LANDMARK_COUNT = 33
 
 _ARM_SEGMENT = 0.16
 """Upper arm and forearm, equal length, in normalised image units."""
@@ -176,9 +174,10 @@ def _landmarks(
 
     hip = (shoulder[0] - forward * _SHOULDER_TO_HIP, shoulder[1])
     # Rotating the leg about the hip by d leaves a Hip Angle of 180 - |d|.
-    # The y term carries no `forward` factor, so mirroring the facing does not
-    # flip which way the body line bends.
-    bend = radians(hip_deviation_deg) * forward
+    # Only the x term carries the `forward` factor, so changing the facing
+    # mirrors the figure horizontally and leaves the bend pointing the same
+    # way: a sag stays a sag rather than turning into a pike.
+    bend = radians(hip_deviation_deg)
     leg = (-forward * cos(bend), -sin(bend))
     knee = (hip[0] + leg[0] * _HIP_TO_KNEE, hip[1] + leg[1] * _HIP_TO_KNEE)
     ankle = (knee[0] + leg[0] * _KNEE_TO_ANKLE, knee[1] + leg[1] * _KNEE_TO_ANKLE)

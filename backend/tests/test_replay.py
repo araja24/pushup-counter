@@ -59,3 +59,36 @@ def test_a_missing_recording_reports_the_problem_instead_of_a_traceback(tmp_path
 
     assert exit_code == 1
     assert "nope.json" in capsys.readouterr().err
+
+
+def test_a_recording_without_frames_reports_the_problem_instead_of_a_traceback(tmp_path, capsys):
+    path = tmp_path / "envelope.json"
+    path.write_text(json.dumps({"label": "good"}), encoding="utf-8")
+
+    exit_code = replay.main([str(path)])
+
+    assert exit_code == 1
+    assert "malformed recording" in capsys.readouterr().err
+
+
+def test_a_recording_that_is_not_an_envelope_reports_the_problem(tmp_path, capsys):
+    path = tmp_path / "bare-list.json"
+    path.write_text(json.dumps([1, 2, 3]), encoding="utf-8")
+
+    assert replay.main([str(path)]) == 1
+    assert "malformed recording" in capsys.readouterr().err
+
+
+def test_a_recording_with_a_malformed_frame_reports_the_problem(recording, capsys):
+    path = recording([{"t": 0, "lm": [[0.0, 0.0, 0.0, 0.9]] * 5}])
+
+    assert replay.main([str(path)]) == 1
+    assert "malformed recording" in capsys.readouterr().err
+
+
+def test_a_recording_of_unreadable_json_reports_the_problem(tmp_path, capsys):
+    path = tmp_path / "broken.json"
+    path.write_text("{not json", encoding="utf-8")
+
+    assert replay.main([str(path)]) == 1
+    assert "not valid JSON" in capsys.readouterr().err

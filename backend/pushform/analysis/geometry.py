@@ -22,6 +22,7 @@ __all__ = [
     "KNEE",
     "ANKLE",
     "SIDES",
+    "LANDMARK_COUNT",
     "angle_deg",
     "point",
     "visibility",
@@ -40,6 +41,9 @@ Frame: TypeAlias = dict[str, object]
 """One Frame as it arrives from the phone: ``{"t": milliseconds, "lm": Landmarks}``."""
 
 SIDES: tuple[Side, Side] = ("left", "right")
+
+LANDMARK_COUNT = 33
+"""How many Landmarks MediaPipe reports per Frame."""
 
 # MediaPipe Pose indices. Odd indices are the left side of the body.
 NOSE = 0
