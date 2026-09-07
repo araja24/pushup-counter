@@ -24,6 +24,18 @@ Status vocabulary: `pass`, `fail (reason)`, or `pending — needs human (no devi
 | 10 | Tracking keeps up with movement (roughly 30 fps preview, no visible lag) and the phone does not overheat in a couple of minutes. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
 | 11 | The pose model and WASM runtime load over the network on a cold cache within a few seconds. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
 
+## Live counting (#5)
+
+| # | Check | Android Chrome | iOS Safari |
+| - | ----- | -------------- | ---------- |
+| 1 | Pressing Start counts reps live: five push-ups show five on the counter. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 2 | Each counted rep makes a high tone and a short buzz; the mute toggle silences the tone and is still muted after a reload. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 3 | The counter is readable from two metres away with the phone propped up in landscape. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 4 | The corner readout tracks the movement: the phase flips UP/DOWN and the elbow angle moves with the arms. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 5 | Stop shows a summary with the same count, and "Another set" counts again from zero on the same connection. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 6 | Reset mid-set puts the counter back to zero without a summary. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 7 | Counting keeps up over mobile data with no growing lag (frames are dropped, never queued). | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+
 ### Devices used
 
 | Row | Device | OS / browser version | Tested by | Date |
