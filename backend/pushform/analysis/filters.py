@@ -24,7 +24,6 @@ class MedianFilter:
     """
 
     def __init__(self, window: int) -> None:
-        self._window = window
         self._values: deque[float] = deque(maxlen=window)
 
     def push(self, value: float) -> float:
@@ -46,7 +45,6 @@ class TrackedSideSelector:
     """
 
     def __init__(self, window: int, visibility_floor: float) -> None:
-        self._window = window
         self._visibility_floor = visibility_floor
         self._history: dict[Side, deque[float]] = {
             side: deque(maxlen=window) for side in geometry.SIDES
