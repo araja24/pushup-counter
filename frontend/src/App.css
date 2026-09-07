@@ -1,0 +1,196 @@
+:root {
+  color-scheme: dark;
+}
+
+.screen {
+  min-height: 100dvh;
+  margin: 0 auto;
+  color: #f2f5f4;
+  background: #0e1412;
+}
+
+.screen--prose {
+  max-width: 34rem;
+  padding: 1.5rem 1.25rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.screen--prose h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.screen--prose h2 {
+  margin: 0.75rem 0 0;
+  font-size: 1.1rem;
+  color: #9fb3ac;
+}
+
+.lede {
+  margin: 0;
+  color: #b9c7c2;
+}
+
+.screen--prose ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  line-height: 1.5;
+}
+
+button {
+  min-height: 3rem;
+  padding: 0 1.5rem;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  color: #0e1412;
+  background: #5ef2b0;
+  cursor: pointer;
+}
+
+button:disabled {
+  color: #6d7c77;
+  background: #253029;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #ff9c8f;
+}
+
+/* Camera stage */
+
+.screen--stage {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.stage {
+  position: relative;
+  min-height: 0;
+  background: #000;
+}
+
+.stage__video,
+.stage__overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Mirror the display only -- landmarks stay in image space (ADR-0006). */
+.stage__video {
+  transform: scaleX(-1);
+}
+
+.guide {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  background: #0e1412;
+}
+
+.guide__text {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.rotate-hint {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-content: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+  background: #0e1412;
+}
+
+/* Live counter */
+
+/* Readable from the floor, two metres away: never below 120px, and bigger on
+   a roomier screen. The stage is landscape by the time a set starts. */
+.count {
+  position: absolute;
+  inset: auto auto 0.5rem 1rem;
+  margin: 0;
+  font-size: max(120px, 26vmin);
+  font-weight: 700;
+  line-height: 0.9;
+  color: #f2f5f4;
+  text-shadow: 0 2px 12px rgb(0 0 0 / 70%);
+}
+
+.count--summary {
+  position: static;
+  font-size: max(120px, 20vmin);
+}
+
+.tally {
+  position: absolute;
+  inset: auto 1rem 0.75rem auto;
+  margin: 0;
+  font-size: 1rem;
+  color: #b9c7c2;
+  text-shadow: 0 1px 6px rgb(0 0 0 / 70%);
+}
+
+.readout {
+  position: absolute;
+  inset: 0.75rem 1rem auto auto;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+  color: #9fb3ac;
+  text-shadow: 0 1px 6px rgb(0 0 0 / 70%);
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.figures dt {
+  color: #9fb3ac;
+}
+
+.figures dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.notice {
+  position: absolute;
+  inset: auto 1rem 4.5rem 1rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  color: #ff9c8f;
+  background: rgb(14 20 18 / 85%);
+}
