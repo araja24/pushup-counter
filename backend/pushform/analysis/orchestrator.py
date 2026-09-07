@@ -167,6 +167,23 @@ class Orchestrator:
         self._sides.reset()
         self._phase.reset()
 
+    def lose_tracking(self) -> None:
+        """Treat what is in flight as Tracking Lost, keeping the Set's totals.
+
+        The Rep underway is abandoned rather than completed and the rolling
+        windows start again, because the Frames either side of the gap are not
+        one continuous movement. Counting resumes at the next lockout.
+        """
+        self._down_phase = None
+        self._locked_out = False
+        self._tracking = False
+        self._elbow_angle = None
+        self._hip_angle = None
+        self._side = None
+        self._elbow_filter.reset()
+        self._sides.reset()
+        self._phase.reset()
+
     def _advance(self, elbow_angle: float, t_ms: int) -> list[Event]:
         """Apply one smoothed Elbow Angle to the Phase machine and the Rep in progress."""
         previous = self._phase.phase

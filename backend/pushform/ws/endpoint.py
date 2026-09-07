@@ -18,7 +18,7 @@ router = APIRouter()
 async def stream_landmarks(websocket: WebSocket) -> None:
     """Hold one Connection open until the phone goes away."""
     await websocket.accept()
-    connection = Connection(now=websocket.app.state.now)
+    connection = Connection(now=websocket.app.state.now, orphans=websocket.app.state.orphans)
     try:
         while True:
             incoming = await websocket.receive()
@@ -28,6 +28,9 @@ async def stream_landmarks(websocket: WebSocket) -> None:
                 await websocket.send_json(reply)
     except WebSocketDisconnect:
         return
+    finally:
+        # However the socket ended, a Set in progress waits for the phone to dial back.
+        connection.park()
 
 
 def answer(connection: Connection, incoming: Message) -> list[dict]:

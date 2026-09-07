@@ -20,6 +20,7 @@ from collections.abc import Callable
 from pushform.analysis.config import DEFAULT_CONFIG, AnalysisConfig
 from pushform.analysis.events import Event, Phase, RepCompleted, State, Summary
 from pushform.analysis.orchestrator import Orchestrator
+from pushform.ws.orphans import OrphanStore
 
 __all__ = ["Connection", "STATE_INTERVAL_S"]
 
@@ -31,7 +32,7 @@ _PREVIEW_SET_ID = "preview"
 """The Set the Orchestrator runs between the user's Sets, so the readout stays
 live. Nothing it counts is ever reported."""
 
-COMMANDS = ("start", "stop", "reset")
+COMMANDS = ("start", "stop", "reset", "resume")
 
 
 class Connection:
@@ -42,9 +43,11 @@ class Connection:
         now: Callable[[], float],
         config: AnalysisConfig = DEFAULT_CONFIG,
         state_interval_s: float = STATE_INTERVAL_S,
+        orphans: OrphanStore | None = None,
     ) -> None:
         self._now = now
         self._state_interval_s = state_interval_s
+        self._orphans = orphans if orphans is not None else OrphanStore(now)
         self._orchestrator = Orchestrator(config)
         self._set_id: str | None = None
         self._last_state_s: float | None = None
@@ -68,6 +71,17 @@ class Connection:
             return self._on_command(message)
         return [error("malformed", "Send a Frame with 'lm' or a command with 'cmd'.")]
 
+    def park(self) -> None:
+        """Leave the Set in progress where a reconnecting phone can claim it.
+
+        Called when the socket goes away. A Connection with no Set of its own
+        parks nothing: there is nothing to come back to.
+        """
+        if self._set_id is None:
+            return
+        self._orphans.park(self._set_id, self._orchestrator)
+        self._set_id = None
+
     def _on_frame(self, frame: dict) -> list[dict]:
         try:
             events = self._orchestrator.process(frame)
@@ -86,6 +100,8 @@ class Connection:
             return [error("unknown_command", f"Unknown command {command!r}.")]
         if command == "start":
             return self._start(message.get("set_id"))
+        if command == "resume":
+            return self._resume(message.get("set_id"))
         if command == "stop":
             return self._stop()
         return self._reset()
@@ -94,6 +110,40 @@ class Connection:
         if not isinstance(set_id, str) or not set_id:
             return [error("malformed", "start needs a 'set_id'.")]
         self._orchestrator.start(set_id)
+        self._set_id = set_id
+        return [self._forced_state()]
+
+    def _resume(self, set_id: object) -> list[dict]:
+        """Pick a Set back up after the wire broke.
+
+        A Set nobody parked, or one that waited too long to be claimed, is not
+        something the phone can do anything about: it is told why, and gets a
+        fresh Set under the same id so the user counts on from zero rather than
+        being stuck.
+        """
+        if not isinstance(set_id, str) or not set_id:
+            return [error("malformed", "resume needs a 'set_id'.")]
+        adoption = self._orphans.adopt(set_id)
+        if adoption.orchestrator is not None:
+            return self._adopt(set_id, adoption.orchestrator)
+        if adoption.expired:
+            refusal = error(
+                "set_expired", f"Set {set_id!r} waited too long to be resumed; starting a new one."
+            )
+        else:
+            refusal = error(
+                "unknown_set", f"No Set {set_id!r} is waiting to be resumed; starting a new one."
+            )
+        return [refusal, *self._start(set_id)]
+
+    def _adopt(self, set_id: str, orchestrator: Orchestrator) -> list[dict]:
+        """Carry a parked Set on with its counts and Phase intact.
+
+        The Frames of the gap were never sent and are never made up: whatever Rep
+        was in flight is Tracking Lost, and counting picks up at the next lockout.
+        """
+        self._orchestrator = orchestrator
+        self._orchestrator.lose_tracking()
         self._set_id = set_id
         return [self._forced_state()]
 
