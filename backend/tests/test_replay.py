@@ -92,3 +92,21 @@ def test_a_recording_of_unreadable_json_reports_the_problem(tmp_path, capsys):
 
     assert replay.main([str(path)]) == 1
     assert "not valid JSON" in capsys.readouterr().err
+
+
+def test_a_recording_that_stalls_logs_the_stall_rather_than_crashing(recording, capsys):
+    """Every event the analysis can emit has to have a line in the log."""
+    path = recording(synthetic.frames_from_angles([170.0] * 5 + [125.0] * 60))
+
+    assert replay.main([str(path)]) == 0
+    assert "stalled" in capsys.readouterr().out
+
+
+def test_a_recording_that_loses_the_user_logs_the_loss(recording, capsys):
+    hidden = {index: 0.1 for index in (11, 12, 13, 14, 15, 16)}
+    path = recording(
+        synthetic.frames_from_angles([170.0] * 30, visibility=lambda _index: hidden)
+    )
+
+    assert replay.main([str(path)]) == 0
+    assert "tracking lost" in capsys.readouterr().out

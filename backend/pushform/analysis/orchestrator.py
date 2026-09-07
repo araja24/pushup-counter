@@ -15,10 +15,21 @@ from dataclasses import dataclass
 
 from pushform.analysis import geometry
 from pushform.analysis.config import DEFAULT_CONFIG, AnalysisConfig
-from pushform.analysis.events import Event, Phase, PhaseChanged, RepCompleted, State, Summary
+from pushform.analysis.events import (
+    Event,
+    Phase,
+    PhaseChanged,
+    RepCompleted,
+    State,
+    Summary,
+    TrackingLost,
+    TrackingRegained,
+)
 from pushform.analysis.filters import MedianFilter, TrackedSideSelector
 from pushform.analysis.geometry import Frame, Landmarks, Side
 from pushform.analysis.phase import PhaseMachine
+from pushform.analysis.stall import StallDetector
+from pushform.analysis.tracking import Reading, TrackingMonitor
 
 __all__ = ["Orchestrator"]
 
@@ -69,7 +80,9 @@ class Orchestrator:
     def __init__(self, config: AnalysisConfig = DEFAULT_CONFIG) -> None:
         self._config = config
         self._elbow_filter = MedianFilter(config.median_window)
-        self._sides = TrackedSideSelector(config.side_window, config.visibility_floor)
+        self._sides = TrackedSideSelector(config.side_window)
+        self._tracker = TrackingMonitor(config)
+        self._stalls = StallDetector(config)
         self._phase = PhaseMachine(config)
         self.reset()
 
@@ -89,7 +102,7 @@ class Orchestrator:
             hip_angle=self._hip_angle,
             aligned=True,  # Placeholder until the hip rules land (#8).
             tracking=self._tracking,
-            stalled=False,
+            stalled=self._stalls.stalled,
             side=self._side,
         )
 
@@ -103,7 +116,10 @@ class Orchestrator:
         """Take one wire-shape Frame and return the events it caused.
 
         Frames arriving outside a Set are ignored without being read: no
-        events, and the State keeps reporting IDLE.
+        events, and the State keeps reporting IDLE. A Frame whose Tracked Side
+        is unseen holds the last good Elbow Angle rather than measuring this
+        one; once Tracking is Lost the Phase machine is not fed at all, so it
+        freezes where it was and the Rep resumes when the user reappears.
 
         Raises:
             ValueError: The Frame is not in wire shape. One error for every
@@ -114,17 +130,23 @@ class Orchestrator:
             return []
 
         t_ms, landmarks = _read(frame)
-        self._side = self._sides.update(landmarks)
-        self._tracking = self._sides.is_tracked(self._side)
-        self._hip_angle = geometry.hip_angle(landmarks, self._side)
-        elbow_angle = self._elbow_filter.push(geometry.elbow_angle(landmarks, self._side))
-        self._elbow_angle = elbow_angle
-
         if self._first_frame_ms is None:
             self._first_frame_ms = t_ms
         self._last_frame_ms = t_ms
 
-        events = self._advance(elbow_angle, t_ms)
+        self._choose_side(landmarks)
+        reading = self._tracker.update(geometry.arm_visibility(landmarks, self._side))
+        events = self._report_tracking(reading, t_ms)
+        if reading is Reading.TRACKED:
+            self._measure(landmarks)
+        elbow_angle = self._elbow_angle
+        if reading is Reading.LOST or elbow_angle is None:
+            return events
+
+        stall = self._stalls.update(elbow_angle, t_ms)
+        if stall is not None:
+            events.append(stall)
+        events.extend(self._advance(elbow_angle, t_ms))
         if elbow_angle > self._config.up_threshold_deg:
             self._locked_out = True
         return events
@@ -163,9 +185,57 @@ class Orchestrator:
         self._hip_angle: float | None = None
         self._side: Side | None = None
         self._tracking = False
+        self._tracking_lost = False
         self._elbow_filter.reset()
         self._sides.reset()
+        self._tracker.reset()
+        self._stalls.reset()
         self._phase.reset()
+
+    def _choose_side(self, landmarks: Landmarks) -> None:
+        """Pick the Tracked Side, and start the smoothing over if it changed.
+
+        Only re-evaluated outside DOWN: mid-Rep the two arms are at different
+        points of the same movement, so swapping would rewrite the Rep's depth.
+        The one exception is a Phase already frozen by Tracking Lost -- there is
+        no live Rep to protect, and the other arm being visible is the only way
+        back, so refusing to switch would strand counting in DOWN for good.
+
+        A switch starts the smoothing over. The median window is the abandoned
+        arm's history, and keeping it would report that arm for two more Frames
+        -- a stale lockout followed by the new arm's real angle is exactly the
+        fake descent that invents a Rep.
+        """
+        previous = self._side
+        may_switch = self._phase.phase is not Phase.DOWN or self._tracker.lost
+        self._side = self._sides.update(landmarks, may_switch=may_switch)
+        if previous is not None and self._side != previous:
+            self._elbow_filter.reset()
+
+    def _measure(self, landmarks: Landmarks) -> None:
+        """Read this Frame's angles off the Tracked Side."""
+        self._hip_angle = geometry.hip_angle(landmarks, self._side)
+        self._elbow_angle = self._elbow_filter.push(
+            geometry.elbow_angle(landmarks, self._side)
+        )
+
+    def _report_tracking(self, reading: Reading, t_ms: int) -> list[Event]:
+        """Announce a change in whether the user can be seen, once per change.
+
+        A held Frame still counts as tracked: the last good angle stands in for
+        it and nothing downstream can tell the difference, which is the point.
+        """
+        lost = reading is Reading.LOST
+        self._tracking = not lost
+        if lost == self._tracking_lost:
+            return []
+        self._tracking_lost = lost
+        if not lost:
+            return [TrackingRegained(t_ms=t_ms)]
+        # A frozen machine cannot be stalled, and the dwell clock must not run
+        # through a gap nobody could see.
+        self._stalls.reset()
+        return [TrackingLost(t_ms=t_ms)]
 
     def _advance(self, elbow_angle: float, t_ms: int) -> list[Event]:
         """Apply one smoothed Elbow Angle to the Phase machine and the Rep in progress."""

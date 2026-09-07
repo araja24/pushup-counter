@@ -36,6 +36,16 @@ class AnalysisConfig:
     bounce_ms: int = 400
     """A DOWN Phase shorter than this is a Bounce: it changes Phase but is never a Rep."""
 
+    tracking_grace_frames: int = 5
+    """Consecutive Frames below the visibility floor the last good Elbow Angle is
+    held for. Tracking is Lost only after *more* than this many, so an arm lost
+    for a blink costs nothing."""
+
+    stall_ms: int = 1500
+    """How long the Elbow Angle may sit between the two thresholds before it is
+    a Stall. Longer than a slow Rep spends crossing the band, shorter than a
+    user stuck at half depth will wait for a prompt."""
+
 
 DEFAULT_CONFIG = AnalysisConfig()
 """The tuning every caller gets unless it deliberately passes its own."""

@@ -174,3 +174,23 @@ def test_a_positive_hip_deviation_sags_the_hips_below_the_body_line():
     # y grows downwards, so sagging hips leave the ankle above the hip.
     assert sag[geometry.ANKLE["left"]][1] < sag[geometry.HIP["left"]][1]
     assert pike[geometry.ANKLE["left"]][1] > pike[geometry.HIP["left"]][1]
+
+
+def test_a_two_sided_figure_gives_each_arm_its_own_elbow_angle():
+    """The fixture for a Tracked Side switch: the arms must read differently."""
+    frames = synthetic.frames_from_side_angles([170.0] * 3, [90.0] * 3)
+
+    for frame in frames:
+        assert geometry.elbow_angle(frame["lm"], "left") == pytest.approx(170.0, abs=0.5)
+        assert geometry.elbow_angle(frame["lm"], "right") == pytest.approx(90.0, abs=0.5)
+
+
+def test_a_two_sided_figure_still_takes_visibility_overrides():
+    frames = synthetic.frames_from_side_angles(
+        [170.0] * 2,
+        [90.0] * 2,
+        visibility=lambda _index: {geometry.ELBOW["right"]: 0.1},
+    )
+
+    assert geometry.visibility(frames[0]["lm"], geometry.ELBOW["right"]) == 0.1
+    assert geometry.visibility(frames[0]["lm"], geometry.ELBOW["left"]) > 0.9

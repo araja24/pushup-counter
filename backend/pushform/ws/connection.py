@@ -20,6 +20,8 @@ from collections.abc import Callable
 from pushform.analysis.config import DEFAULT_CONFIG, AnalysisConfig
 from pushform.analysis.events import Event, Phase, RepCompleted, State, Summary
 from pushform.analysis.orchestrator import Orchestrator
+from pushform.ws.config_command import ConfigRejected, config_from
+from pushform.ws.rate_limit import FrameRateLimiter
 
 __all__ = ["Connection", "STATE_INTERVAL_S"]
 
@@ -31,7 +33,7 @@ _PREVIEW_SET_ID = "preview"
 """The Set the Orchestrator runs between the user's Sets, so the readout stays
 live. Nothing it counts is ever reported."""
 
-COMMANDS = ("start", "stop", "reset")
+COMMANDS = ("start", "stop", "reset", "config")
 
 
 class Connection:
@@ -45,6 +47,8 @@ class Connection:
     ) -> None:
         self._now = now
         self._state_interval_s = state_interval_s
+        self._config = config
+        self._frame_rate = FrameRateLimiter()
         self._orchestrator = Orchestrator(config)
         self._set_id: str | None = None
         self._last_state_s: float | None = None
@@ -69,6 +73,9 @@ class Connection:
         return [error("malformed", "Send a Frame with 'lm' or a command with 'cmd'.")]
 
     def _on_frame(self, frame: dict) -> list[dict]:
+        now_s = self._now()
+        if not self._frame_rate.allow(now_s):
+            return []
         try:
             events = self._orchestrator.process(frame)
         except ValueError as bad_frame:
@@ -76,7 +83,7 @@ class Connection:
 
         counting = self._set_id is not None
         messages = [rep_message(rep) for rep in reps(events)] if counting else []
-        if self._state_due():
+        if self._state_due(now_s):
             messages.append(self._state_message())
         return messages
 
@@ -88,6 +95,8 @@ class Connection:
             return self._start(message.get("set_id"))
         if command == "stop":
             return self._stop()
+        if command == "config":
+            return self._configure(message)
         return self._reset()
 
     def _start(self, set_id: object) -> list[dict]:
@@ -113,14 +122,34 @@ class Connection:
         self._begin_preview()
         return [self._forced_state()]
 
+    def _configure(self, message: dict) -> list[dict]:
+        """Retune the thresholds this Connection's next Sets are judged by.
+
+        Refused while a Set is running: an :class:`AnalysisConfig` is frozen so
+        a Set cannot be retuned underneath itself, and a Summary counted under
+        two definitions of a Rep would mean nothing.
+        """
+        if self._set_id is not None:
+            return [error("config_during_set", "Stop the Set before changing thresholds.")]
+        try:
+            self._config = config_from(message, self._config)
+        except ConfigRejected as rejected:
+            return [error("invalid_config", str(rejected))]
+        self._orchestrator = Orchestrator(self._config)
+        self._begin_preview()
+        return [self._forced_state()]
+
     def _begin_preview(self) -> None:
         """Keep the Orchestrator running so the readout survives between Sets."""
         self._orchestrator.reset()
         self._orchestrator.start(_PREVIEW_SET_ID)
 
-    def _state_due(self) -> bool:
-        """True at most once per state interval, by the injected wall clock."""
-        now_s = self._now()
+    def _state_due(self, now_s: float) -> bool:
+        """True at most once per state interval, by the injected wall clock.
+
+        Given the reading rather than taking one, so that a Frame is one tick of
+        the clock however many decisions are made about it.
+        """
         if self._last_state_s is not None and now_s - self._last_state_s < self._state_interval_s:
             return False
         self._last_state_s = now_s

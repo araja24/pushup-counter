@@ -13,7 +13,16 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from pushform.analysis.events import Event, PhaseChanged, RepCompleted, Summary
+from pushform.analysis.events import (
+    Event,
+    PhaseChanged,
+    RepCompleted,
+    Stall,
+    StallCleared,
+    Summary,
+    TrackingLost,
+    TrackingRegained,
+)
 from pushform.analysis.orchestrator import Orchestrator
 
 __all__ = ["main"]
@@ -89,6 +98,17 @@ def describe(event: Event) -> str:
             f"  elbow {event.min_elbow:.1f}-{event.max_elbow:.1f} deg"
             f"  {event.label}"
         )
+    if isinstance(event, TrackingLost):
+        return f"{event.t_ms:>7} ms  tracking lost"
+    if isinstance(event, TrackingRegained):
+        return f"{event.t_ms:>7} ms  tracking regained"
+    if isinstance(event, Stall):
+        return (
+            f"{event.t_ms:>7} ms  stalled at {event.elbow_angle:.1f} deg"
+            f" for {event.held_ms} ms"
+        )
+    if isinstance(event, StallCleared):
+        return f"{event.t_ms:>7} ms  stall cleared at {event.elbow_angle:.1f} deg"
     if isinstance(event, Summary):
         return (
             f"{'':>7}     set of {event.reps} reps, {event.rejected} rejected,"

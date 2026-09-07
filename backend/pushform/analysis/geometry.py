@@ -26,6 +26,7 @@ __all__ = [
     "angle_deg",
     "point",
     "visibility",
+    "arm_visibility",
     "elbow_angle",
     "hip_angle",
 ]
@@ -97,3 +98,15 @@ def hip_angle(landmarks: Landmarks, side: Side) -> float:
         point(landmarks, HIP[side]),
         point(landmarks, ANKLE[side]),
     )
+
+
+def arm_visibility(landmarks: Landmarks, side: Side) -> float:
+    """How well one arm can be seen: the mean visibility of the three Landmarks
+    the Elbow Angle is made of.
+
+    A mean rather than a minimum because all three are needed and they fail
+    together: a shoulder lost while the elbow and wrist are crisp is detector
+    noise, not an arm out of shot.
+    """
+    parts = (SHOULDER[side], ELBOW[side], WRIST[side])
+    return sum(visibility(landmarks, index) for index in parts) / len(parts)

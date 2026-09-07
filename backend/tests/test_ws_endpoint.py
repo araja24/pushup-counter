@@ -5,70 +5,12 @@ so the wire contract is asserted from outside rather than from the Connection's
 own vocabulary.
 """
 
-from collections.abc import Iterator
-
 import pytest
-from fastapi.testclient import TestClient
 
 from pushform.analysis import synthetic
-from pushform.app import create_app
-
-
-class Clock:
-    """A wall clock the test winds on, so the throttle is tested without sleeping."""
-
-    def __init__(self, step_s: float = 0.0) -> None:
-        self.seconds = 0.0
-        self.step_s = step_s
-        """Seconds every reading moves the clock on. Set it before sending anything."""
-
-    def __call__(self) -> float:
-        now = self.seconds
-        self.seconds += self.step_s
-        return now
-
-
-@pytest.fixture
-def clock() -> Clock:
-    return Clock()
-
-
-@pytest.fixture
-def socket(clock: Clock) -> Iterator:
-    with TestClient(create_app(now=clock)) as client, client.websocket_connect("/ws") as ws:
-        yield ws
-
-
-def drain(ws, frames: list[dict]) -> list[dict]:
-    """Stream Frames, stop the Set, and read everything back up to the Summary."""
-    for frame in frames:
-        ws.send_json(frame)
-    ws.send_json({"cmd": "stop"})
-    return read_until(ws, "summary")
-
-
-def read_until(ws, kind: str) -> list[dict]:
-    messages = []
-    while True:
-        message = ws.receive_json()
-        messages.append(message)
-        if message["type"] == kind:
-            return messages
-
-
-def read_until_counting(ws) -> list[dict]:
-    """Everything said before the Set started, up to but not including the first
-    State that is counting."""
-    before = []
-    while True:
-        message = ws.receive_json()
-        if message["type"] == "state" and message["phase"] != "IDLE":
-            return before
-        before.append(message)
-
-
-def kinds(messages: list[dict], kind: str) -> list[dict]:
-    return [message for message in messages if message["type"] == kind]
+from pushform.ws.connection import Connection
+from pushform.ws.endpoint import answer
+from ws_support import drain, kinds, read_until, read_until_counting
 
 
 def test_a_clean_set_of_five_counts_five_and_summarises(socket):
@@ -263,14 +205,30 @@ def test_a_malformed_frame_is_refused_and_the_connection_stays_open(socket):
     assert kinds(messages, "summary")[0]["reps"] == 1
 
 
-def test_state_messages_are_throttled_to_fifteen_a_second(clock):
+def test_state_messages_are_throttled_to_fifteen_a_second(clock, socket):
     """Thirty Frames a second for two seconds is about thirty State messages."""
     clock.step_s = 1.0 / 30.0
     frames = synthetic.frames_from_angles([170.0] * 60, fps=30)
 
-    with TestClient(create_app(now=clock)) as client, client.websocket_connect("/ws") as ws:
-        ws.send_json({"cmd": "start", "set_id": "set-1"})
-        messages = drain(ws, frames)
+    socket.send_json({"cmd": "start", "set_id": "set-1"})
+    messages = drain(socket, frames)
 
     states = kinds(messages, "state")
     assert 25 <= len(states) <= 32, f"{len(states)} State messages for 60 Frames"
+
+
+def test_a_receive_carrying_a_null_text_field_is_refused_rather_than_crashing():
+    """ASGI allows {"type": "websocket.receive", "text": None, "bytes": ...}.
+
+    A "text" in message guard passes that shape straight to the JSON parser,
+    which raises on None and takes the whole Connection down. Only a real string
+    is a message this endpoint can read.
+    """
+    connection = Connection(now=lambda: 0.0)
+
+    replies = answer(
+        connection, {"type": "websocket.receive", "text": None, "bytes": bytes([0, 1])}
+    )
+
+    assert [reply["type"] for reply in replies] == ["error"]
+    assert [reply["code"] for reply in replies] == ["malformed"]

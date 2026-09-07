@@ -26,7 +26,14 @@ from typing import Literal, TypeAlias
 from pushform.analysis import geometry
 from pushform.analysis.geometry import LANDMARK_COUNT, Frame, Side
 
-__all__ = ["Frame", "StartPhase", "VisibilityOverride", "frames_from_angles", "generate_frames"]
+__all__ = [
+    "Frame",
+    "StartPhase",
+    "VisibilityOverride",
+    "frames_from_angles",
+    "frames_from_side_angles",
+    "generate_frames",
+]
 
 StartPhase = Literal["up", "down"]
 
@@ -146,6 +153,52 @@ def frames_from_angles(
         }
         for index, angle in enumerate(elbow_angles)
     ]
+
+
+def frames_from_side_angles(
+    left_angles: Sequence[float],
+    right_angles: Sequence[float],
+    *,
+    fps: int = 30,
+    facing: Side = "right",
+    visibility: VisibilityOverride | None = None,
+) -> list[Frame]:
+    """Wire-shape Frames whose two arms hold different Elbow Angles.
+
+    A side-on figure projects both arms onto the same points, which is honest
+    about a real camera but leaves a Tracked Side switch invisible: both sides
+    read the same angle, so no test can tell which arm the analysis used. This
+    draws one figure per side and keeps each side's own Landmarks, so the
+    reported Elbow Angle names the Tracked Side.
+
+    The head, torso and legs come from the left figure; only the right
+    shoulder, elbow, wrist, hip, knee and ankle come from the right one.
+    """
+    left_frames = frames_from_angles(left_angles, fps=fps, facing=facing)
+    right_frames = frames_from_angles(right_angles, fps=fps, facing=facing)
+    frames: list[Frame] = []
+    for index, (left, right) in enumerate(zip(left_frames, right_frames, strict=True)):
+        landmarks: list[list[float]] = left["lm"]  # type: ignore[assignment]
+        other: list[list[float]] = right["lm"]  # type: ignore[assignment]
+        for part in _SIDED_PARTS:
+            landmarks[part["right"]] = list(other[part["right"]])
+        overrides = visibility(index) if visibility else None
+        for landmark_index, value in (overrides or {}).items():
+            landmarks[landmark_index][3] = value
+        frames.append(left)
+    return frames
+
+
+_SIDED_PARTS = (
+    geometry.SHOULDER,
+    geometry.ELBOW,
+    geometry.WRIST,
+    geometry.HIP,
+    geometry.KNEE,
+    geometry.ANKLE,
+)
+"""The Landmarks a figure has one of per side, and so the ones a two-sided
+Frame takes from its right-hand figure."""
 
 
 def _landmarks(

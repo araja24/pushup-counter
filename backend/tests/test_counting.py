@@ -81,9 +81,12 @@ def test_an_angle_oscillating_inside_the_band_never_changes_phase(run_set):
 
     orchestrator, events = run_set(synthetic.frames_from_angles(inside_the_band))
 
-    assert events == []
+    assert phase_changes(events) == []
+    assert reps_of(events) == []
     assert orchestrator.state.reps == 0
     assert orchestrator.state.phase is Phase.UP
+    # Two seconds of it is also a Stall, which is the other half of the story:
+    # see tests/test_stall.py.
 
 
 def test_rising_into_the_band_but_not_past_it_does_not_leave_down(run_set):

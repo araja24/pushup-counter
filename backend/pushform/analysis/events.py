@@ -16,6 +16,10 @@ __all__ = [
     "FAULTS",
     "PhaseChanged",
     "RepCompleted",
+    "TrackingLost",
+    "TrackingRegained",
+    "Stall",
+    "StallCleared",
     "Summary",
     "State",
     "Event",
@@ -79,6 +83,45 @@ class RepCompleted:
 
 
 @dataclass(frozen=True, slots=True)
+class TrackingLost:
+    """The Tracked Side went unseen for too long; counting is frozen.
+
+    Emitted once per loss, not once per unseen Frame: it is a change of
+    condition, and the condition itself lives in ``State.tracking``.
+    """
+
+    t_ms: int
+
+
+@dataclass(frozen=True, slots=True)
+class TrackingRegained:
+    """The Tracked Side is visible again and the Rep in progress carries on."""
+
+    t_ms: int
+
+
+@dataclass(frozen=True, slots=True)
+class Stall:
+    """The Elbow Angle has sat between the two thresholds for too long.
+
+    Emitted once per dwell. ``StallCleared`` closes it when the angle finally
+    leaves the band, whichever side it leaves by.
+    """
+
+    t_ms: int
+    elbow_angle: float
+    held_ms: int
+
+
+@dataclass(frozen=True, slots=True)
+class StallCleared:
+    """The Elbow Angle left the band: the user locked out or went down."""
+
+    t_ms: int
+    elbow_angle: float
+
+
+@dataclass(frozen=True, slots=True)
 class Summary:
     """The record a Set leaves behind when it stops."""
 
@@ -93,9 +136,10 @@ class Summary:
 class State:
     """Everything the phone needs to draw one Frame of feedback.
 
-    ``aligned`` is always ``True`` and ``stalled`` always ``False`` until the
-    form rules land: the phone draws a green skeleton and no stall prompt, and
-    the wire shape does not change when the rules arrive.
+    ``aligned`` is always ``True`` until the form rules land (#8): the phone
+    draws a green skeleton, and the wire shape does not change when the rules
+    arrive. ``tracking`` and ``stalled`` are real: they are the two conditions
+    the phone turns into words on screen.
     """
 
     reps: int
@@ -109,5 +153,7 @@ class State:
     side: Side | None
 
 
-Event: TypeAlias = PhaseChanged | RepCompleted | Summary
+Event: TypeAlias = (
+    PhaseChanged | RepCompleted | TrackingLost | TrackingRegained | Stall | StallCleared | Summary
+)
 """Anything the Orchestrator hands back to its caller."""
