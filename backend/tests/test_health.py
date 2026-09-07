@@ -1,5 +1,7 @@
 """The health endpoint is the liveness contract Render and the phone both poll."""
 
+from pushform.analysis.config import DEFAULT_CONFIG
+
 
 def test_health_returns_the_documented_shape(client):
     response = client.get("/api/health")
@@ -35,3 +37,12 @@ def test_config_returns_the_default_phase_thresholds(client):
 
     assert response.status_code == 200
     assert response.json() == {"down_threshold": 95, "up_threshold": 155}
+
+
+def test_config_serves_the_analysis_defaults_rather_than_its_own(client):
+    response = client.get("/api/config")
+
+    assert response.json() == {
+        "down_threshold": DEFAULT_CONFIG.down_threshold_deg,
+        "up_threshold": DEFAULT_CONFIG.up_threshold_deg,
+    }
