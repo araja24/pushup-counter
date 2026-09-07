@@ -36,6 +36,16 @@ Status vocabulary: `pass`, `fail (reason)`, or `pending — needs human (no devi
 | 6 | Reset mid-set puts the counter back to zero without a summary. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
 | 7 | Counting keeps up over mobile data with no growing lag (frames are dropped, never queued). | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
 
+## Tracking, stalls and limits (#6)
+
+| # | Check | Android Chrome | iOS Safari |
+| - | ----- | -------------- | ---------- |
+| 1 | Stepping out of the camera's view mid-set shows "Can't see you"; the counter freezes rather than counting anything, and stepping back in resumes the same rep. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 2 | Holding halfway up for a couple of seconds shows "Lock out your arms"; straightening the arms clears it. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 3 | Both cues are readable as words from two metres, not conveyed by colour alone. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 4 | Turning to face the other way mid-set does not change the count or skip a rep. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 5 | Counting is unaffected on a phone whose camera runs faster than 30 fps (frames above the limit are dropped silently, with no error on screen). | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+
 ### Devices used
 
 | Row | Device | OS / browser version | Tested by | Date |

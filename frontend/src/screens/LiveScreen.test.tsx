@@ -252,4 +252,36 @@ describe('LiveScreen', () => {
       vi.useRealTimers()
     }
   })
+
+  it('tells the user when the backend cannot see them', () => {
+    const { say } = renderLive()
+
+    say(state({ tracking: false }))
+
+    expect(screen.getByText("Can't see you")).toBeInTheDocument()
+  })
+
+  it('asks for a lockout while stalled and stops asking once the angle moves', () => {
+    const { say } = renderLive()
+
+    say(state({ stalled: true }))
+    expect(screen.getByText('Lock out your arms')).toBeInTheDocument()
+
+    say(state({ stalled: false }))
+    expect(screen.queryByText('Lock out your arms')).not.toBeInTheDocument()
+  })
+
+  it('leaves the cue up as long as the condition lasts, unlike a refusal', () => {
+    vi.useFakeTimers()
+    try {
+      const { say } = renderLive()
+
+      say(state({ tracking: false }))
+      act(() => vi.advanceTimersByTime(NOTICE_MS * 2))
+
+      expect(screen.getByText("Can't see you")).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

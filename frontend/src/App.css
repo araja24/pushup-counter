@@ -194,3 +194,16 @@ button:disabled {
   color: #ff9c8f;
   background: rgb(14 20 18 / 85%);
 }
+
+.cue {
+  position: absolute;
+  inset: auto 1rem 8rem 1rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-align: center;
+  color: #0e1412;
+  background: rgb(240 214 120 / 92%);
+}

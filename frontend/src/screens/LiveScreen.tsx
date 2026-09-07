@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { playHighTone } from '../audio/tones'
 import { usePoseTracking } from '../camera/usePoseTracking'
+import { cueFor } from './cues'
 import type { LandmarkSocket, SummaryMessage } from '../net/socket'
 import { toWireFrame } from '../pose/wire'
 import { loadMuted, saveMuted } from '../prefs/mute'
@@ -31,6 +32,8 @@ export function LiveScreen({ stream, socket, onFinished }: LiveScreenProps) {
   const [rejected, setRejected] = useState(0)
   const [phase, setPhase] = useState('IDLE')
   const [elbowAngle, setElbowAngle] = useState<number | null>(null)
+  /** What the backend cannot do for the user right now, in words. */
+  const [cue, setCue] = useState<string | null>(null)
   const [muted, setMuted] = useState(loadMuted)
   const [stopping, setStopping] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -64,6 +67,7 @@ export function LiveScreen({ stream, socket, onFinished }: LiveScreenProps) {
         setRejected(message.rejected)
         setPhase(message.phase)
         setElbowAngle(message.elbow_angle)
+        setCue(cueFor(message))
         return
       }
       if (message.type === 'rep' && message.counted) {
@@ -94,6 +98,7 @@ export function LiveScreen({ stream, socket, onFinished }: LiveScreenProps) {
     socket.start(newSetId())
     setReps(0)
     setRejected(0)
+    setCue(null)
   }
 
   const stop = () => {
@@ -122,6 +127,13 @@ export function LiveScreen({ stream, socket, onFinished }: LiveScreenProps) {
         </p>
         <p className="tally">{rejected} rejected</p>
         <p className="readout">{readout(phase, elbowAngle)}</p>
+        {/* Stays up for as long as the condition does: it is a live state,
+            not a passing message like the notice below it. */}
+        {cue !== null && (
+          <p role="status" className="cue">
+            {cue}
+          </p>
+        )}
         {notice !== null && (
           <p role="status" className="notice">
             {notice}
