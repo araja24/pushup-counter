@@ -194,3 +194,18 @@ button:disabled {
   color: #ff9c8f;
   background: rgb(14 20 18 / 85%);
 }
+
+/* Connection trouble: reconnecting, or a backend still waking up. Pinned to the
+   top of the viewport so it is readable over any screen without moving it. */
+.connection {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 2;
+  margin: 0;
+  padding: calc(0.4rem + env(safe-area-inset-top)) 1rem 0.4rem;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0e1412;
+  background: #ffd166;
+}

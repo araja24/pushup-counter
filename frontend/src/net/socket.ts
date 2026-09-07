@@ -70,11 +70,28 @@ export interface FrameSocketOptions {
   open?: (url: string) => WebSocket
   /** The clock the frame rate is measured by. */
   now?: () => number
+  /** The socket finished its handshake and is taking Frames. */
+  onOpen?: () => void
+  /** The socket went away, however it went. Nothing here reopens it. */
+  onClose?: () => void
 }
+
+/**
+ * What the phone can say about the Connection.
+ *
+ * `waking` is the cold-start case: the very first socket is taking so long that
+ * the backend is probably still starting up.
+ */
+export type ConnectionStatus = 'connecting' | 'waking' | 'open' | 'reconnecting' | 'closed'
 
 /** What a screen needs of the Connection: send Frames, run a Set, hear back. */
 export interface LandmarkSocket {
   listen(listener: (message: ServerMessage) => void): () => void
+  /**
+   * Follow the Connection itself rather than what comes down it. Only a
+   * Connection that can lose its socket and dial back has anything to say here.
+   */
+  listenStatus?(watcher: (status: ConnectionStatus) => void): () => void
   sendFrame(frame: WireFrame): SendResult
   start(setId: string): void
   stop(): void
@@ -96,7 +113,9 @@ export class FrameSocket implements LandmarkSocket {
     this.socket = open(url)
     this.socket.onopen = () => {
       for (const command of this.pending.splice(0)) this.socket.send(command)
+      options.onOpen?.()
     }
+    this.socket.onclose = () => options.onClose?.()
     this.socket.onmessage = (event: MessageEvent) => this.receive(event.data)
   }
 
@@ -131,6 +150,11 @@ export class FrameSocket implements LandmarkSocket {
   /** Begin a Set. Counting starts here; Frames were already flowing. */
   start(setId: string): void {
     this.command({ cmd: 'start', set_id: setId })
+  }
+
+  /** Pick a Set back up after the wire broke, counts and all. */
+  resume(setId: string): void {
+    this.command({ cmd: 'resume', set_id: setId })
   }
 
   /** End the Set. The Summary comes back as a message. */

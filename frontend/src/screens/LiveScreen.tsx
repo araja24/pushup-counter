@@ -78,8 +78,17 @@ export function LiveScreen({ stream, socket, onFinished }: LiveScreenProps) {
       if (message.type === 'error') setNotice(message.message)
     })
 
+    const stopWatching = socket.listenStatus?.((status) => {
+      // A Stop whose Summary never arrived because the wire broke: the Set is
+      // parked for the reconnect, and Stop has to be pressable again.
+      if (status !== 'open') setStopping(false)
+    })
+
     socket.start(newSetId())
-    return stopListening
+    return () => {
+      stopListening()
+      stopWatching?.()
+    }
   }, [socket, onFinished])
 
   useEffect(() => {

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LiveScreen, NOTICE_MS } from './LiveScreen'
 import { MUTE_KEY } from '../prefs/mute'
 import { FrameSocket } from '../net/socket'
-import type { LandmarkSocket, ServerMessage } from '../net/socket'
+import type { ConnectionStatus, LandmarkSocket, ServerMessage } from '../net/socket'
 
 const playHighTone = vi.hoisted(() => vi.fn())
 vi.mock('../audio/tones', () => ({ playHighTone }))
@@ -17,11 +17,16 @@ vi.mock('../camera/usePoseTracking', () => ({
 /** A Connection the test speaks for. */
 function fakeSocket() {
   const listeners: ((message: ServerMessage) => void)[] = []
+  const watchers: ((status: ConnectionStatus) => void)[] = []
   const commands: string[] = []
   const socket: LandmarkSocket = {
     listen: (listener) => {
       listeners.push(listener)
       return () => listeners.splice(listeners.indexOf(listener), 1)
+    },
+    listenStatus: (watcher) => {
+      watchers.push(watcher)
+      return () => watchers.splice(watchers.indexOf(watcher), 1)
     },
     sendFrame: () => 'sent',
     start: (setId) => commands.push(`start:${setId}`),
@@ -33,7 +38,13 @@ function fakeSocket() {
       for (const listener of [...listeners]) listener(message)
     })
   }
-  return { socket, commands, say }
+  /** The Connection itself changed: it dropped, dialled back, or came up. */
+  const connection = (status: ConnectionStatus) => {
+    act(() => {
+      for (const watcher of [...watchers]) watcher(status)
+    })
+  }
+  return { socket, commands, say, connection }
 }
 
 function state(overrides: Partial<Extract<ServerMessage, { type: 'state' }>> = {}) {
@@ -68,11 +79,11 @@ function rep(counted: boolean, index = 1) {
 }
 
 function renderLive(onFinished = vi.fn()) {
-  const { socket, commands, say } = fakeSocket()
+  const { socket, commands, say, connection } = fakeSocket()
   render(
     <LiveScreen stream={{} as MediaStream} socket={socket} onFinished={onFinished} />,
   )
-  return { commands, say, onFinished }
+  return { commands, say, onFinished, connection }
 }
 
 beforeEach(() => {
@@ -186,6 +197,29 @@ describe('LiveScreen', () => {
 
     expect(commands.filter((command) => command === 'stop')).toHaveLength(1)
     expect(stop).toBeDisabled()
+  })
+
+  it('lets the user stop again when the connection dropped before the summary', () => {
+    // The Set is stopping, the wire breaks, and no Summary is ever coming: the
+    // user must not be left on a screen with no way out.
+    const { connection } = renderLive()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeDisabled()
+
+    connection('reconnecting')
+
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled()
+  })
+
+  it('asks the backend to stop again once the connection is back', () => {
+    const { commands, connection } = renderLive()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+
+    connection('reconnecting')
+    connection('open')
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
+
+    expect(commands.filter((command) => command === 'stop')).toHaveLength(2)
   })
 
   it('throws the set away on Reset and counts on into a fresh one', () => {

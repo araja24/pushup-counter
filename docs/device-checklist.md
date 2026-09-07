@@ -36,6 +36,15 @@ Status vocabulary: `pass`, `fail (reason)`, or `pending — needs human (no devi
 | 6 | Reset mid-set puts the counter back to zero without a summary. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
 | 7 | Counting keeps up over mobile data with no growing lag (frames are dropped, never queued). | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
 
+## Reconnect and cold start (#7)
+
+| # | Check | Android Chrome | iOS Safari |
+| - | ----- | -------------- | ---------- |
+| 1 | Turning Wi-Fi off mid-set shows "Reconnecting…" and turning it back on within ten seconds carries on from the same count, not from zero. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 2 | Staying off the network for more than ten seconds explains that the set expired and starts a fresh one counting from zero. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 3 | Pressing Stop while the connection is down leaves Stop usable: the screen is never a dead end. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+| 4 | Opening the app against a sleeping backend shows "Waking up the server" and clears it once the backend answers. | pending — needs human (no device in agent run) | pending — needs human (no device in agent run) |
+
 ### Devices used
 
 | Row | Device | OS / browser version | Tested by | Date |
