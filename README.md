@@ -43,7 +43,9 @@ Milestone progress for v1 (see `docs/prd.md`):
 
 - [x] **Scaffold, CI and one-service deploy** — frontend and backend build and test
       locally, GitHub Actions runs both suites, `render.yaml` exists.
-- [ ] Landmark capture on the phone
+- [x] **Landmark capture on the phone** — explainer, mirrored selfie preview, skeleton
+      overlay from MediaPipe Pose Landmarker, and a positioning guard that gates Start
+      (device confirmation pending, see `docs/device-checklist.md`).
 - [ ] Rep counting over the WebSocket connection
 - [ ] Form faults and the rep classifier
 - [ ] Set summaries
@@ -55,3 +57,5 @@ Pending — needs human:
   GitHub; the agent cannot observe CI).
 - Create the Render service from `render.yaml` and confirm the deployed URL serves the
   placeholder page and `/api/health`.
+- Run `docs/device-checklist.md` on one Android Chrome and one iOS Safari device; every
+  camera and overlay row is still pending.

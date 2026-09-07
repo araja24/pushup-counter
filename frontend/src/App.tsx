@@ -1,19 +1,40 @@
-import { apiBaseUrl } from './net/urls'
+import { useState } from 'react'
+
+import { ExplainerScreen } from './screens/ExplainerScreen'
+import { LiveScreen } from './screens/LiveScreen'
+import { PositioningScreen } from './screens/PositioningScreen'
 import './App.css'
 
-/** Placeholder shell: proves the build is served and the API base resolves. */
-function App() {
-  const { http } = apiBaseUrl(window.location)
+type Stage =
+  | { name: 'explainer' }
+  | { name: 'positioning'; stream: MediaStream }
+  | { name: 'live'; stream: MediaStream }
 
-  return (
-    <main>
-      <h1>PushForm</h1>
-      <p>Counting push-ups from your phone's camera. Nothing to see here yet.</p>
-      <p>
-        API base: <code>{http}</code>
-      </p>
-    </main>
-  )
+/** Explainer, then positioning, then the set. The camera stream follows along. */
+function App() {
+  const [stage, setStage] = useState<Stage>({ name: 'explainer' })
+
+  switch (stage.name) {
+    case 'explainer':
+      return (
+        <ExplainerScreen
+          onGranted={(stream) => setStage({ name: 'positioning', stream })}
+        />
+      )
+    case 'positioning':
+      return (
+        <PositioningScreen
+          stream={stage.stream}
+          onStart={(stream) => setStage({ name: 'live', stream })}
+        />
+      )
+    case 'live':
+      return (
+        <LiveScreen
+          onStop={() => setStage({ name: 'positioning', stream: stage.stream })}
+        />
+      )
+  }
 }
 
 export default App
