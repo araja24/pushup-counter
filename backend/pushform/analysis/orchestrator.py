@@ -87,7 +87,7 @@ class Orchestrator:
             phase=self._phase.phase if self._running else Phase.IDLE,
             elbow_angle=self._elbow_angle,
             hip_angle=self._hip_angle,
-            aligned=None,
+            aligned=True,  # Placeholder until the hip rules land (#8).
             tracking=self._tracking,
             stalled=False,
             side=self._side,

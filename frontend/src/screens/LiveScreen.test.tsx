@@ -2,8 +2,9 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { LiveScreen } from './LiveScreen'
+import { LiveScreen, NOTICE_MS } from './LiveScreen'
 import { MUTE_KEY } from '../prefs/mute'
+import { FrameSocket } from '../net/socket'
 import type { LandmarkSocket, ServerMessage } from '../net/socket'
 
 const playHighTone = vi.hoisted(() => vi.fn())
@@ -176,13 +177,79 @@ describe('LiveScreen', () => {
     expect(onFinished).toHaveBeenCalledWith(summary)
   })
 
-  it('throws the set away on Reset without ending it', () => {
-    const { commands, onFinished } = renderLive()
+  it('cannot be stopped twice, so the backend is never asked to stop nothing', () => {
+    const { commands } = renderLive()
+
+    const stop = screen.getByRole('button', { name: 'Stop' })
+    fireEvent.click(stop)
+    fireEvent.click(stop)
+
+    expect(commands.filter((command) => command === 'stop')).toHaveLength(1)
+    expect(stop).toBeDisabled()
+  })
+
+  it('throws the set away on Reset and counts on into a fresh one', () => {
+    const { commands, say, onFinished } = renderLive()
+    say(state({ reps: 4, rejected: 1 }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
 
-    expect(commands).toContain('reset')
-    expect(commands).not.toContain('stop')
+    const [started, ...afterReset] = commands
+    expect(afterReset[0]).toBe('reset')
+    expect(afterReset[1]).toMatch(/^start:.+/)
+    expect(afterReset[1]).not.toBe(started)
     expect(onFinished).not.toHaveBeenCalled()
+    expect(screen.getByText('0')).toBeInTheDocument()
+    expect(screen.getByText('0 rejected')).toBeInTheDocument()
+  })
+
+  it('keeps counting after a reset, because a new set is already running', () => {
+    const { say } = renderLive()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    say(state({ reps: 1 }))
+
+    expect(screen.getByText('1')).toBeInTheDocument()
+  })
+
+  it('puts reset and a fresh start on the wire, in that order', () => {
+    // The real FrameSocket over a fake WebSocket, so the wire text is asserted.
+    const sent: string[] = []
+    const fake = {
+      readyState: 1,
+      bufferedAmount: 0,
+      send: (text: string) => sent.push(text),
+      close: () => {},
+      onopen: null,
+      onmessage: null,
+    }
+    const socket = new FrameSocket('ws://phone/ws', {
+      open: () => fake as unknown as WebSocket,
+    })
+    render(
+      <LiveScreen stream={{} as MediaStream} socket={socket} onFinished={vi.fn()} />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+
+    const commands = sent.map((text) => JSON.parse(text) as { cmd: string; set_id?: string })
+    expect(commands.map((command) => command.cmd)).toEqual(['start', 'reset', 'start'])
+    expect(commands[2].set_id).not.toBe(commands[0].set_id)
+    expect(commands[2].set_id).toBeTruthy()
+  })
+
+  it('shows what the backend refused, then clears it out of the way', () => {
+    vi.useFakeTimers()
+    try {
+      const { say } = renderLive()
+
+      say({ type: 'error', code: 'no_active_set', message: 'No Set is running.' })
+      expect(screen.getByRole('status')).toHaveTextContent('No Set is running.')
+
+      act(() => vi.advanceTimersByTime(NOTICE_MS))
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

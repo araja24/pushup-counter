@@ -93,8 +93,9 @@ class Summary:
 class State:
     """Everything the phone needs to draw one Frame of feedback.
 
-    ``aligned`` is ``None`` and ``stalled`` is always ``False`` until the form
-    rules land; the fields exist now so the wire shape does not change later.
+    ``aligned`` is always ``True`` and ``stalled`` always ``False`` until the
+    form rules land: the phone draws a green skeleton and no stall prompt, and
+    the wire shape does not change when the rules arrive.
     """
 
     reps: int

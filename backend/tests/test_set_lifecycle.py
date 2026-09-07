@@ -115,7 +115,7 @@ def test_the_state_snapshot_reports_the_current_frame(run_set):
     assert state.hip_angle == pytest.approx(180.0, abs=1.0)
     assert state.side == "left"
     assert state.tracking is True
-    assert state.aligned is None
+    assert state.aligned is True, "the placeholder until the form rules land"
     assert state.stalled is False
     assert state.rejected == 0
 

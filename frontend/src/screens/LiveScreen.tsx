@@ -15,6 +15,9 @@ interface LiveScreenProps {
 
 const VIBRATE_MS = 50
 
+/** How long a refusal from the backend stays on screen before it gets out of the way. */
+export const NOTICE_MS = 2000
+
 /**
  * The Set in progress: the count, and the feedback that reaches a user who is
  * face-down on the floor and cannot read anything -- a tone and a buzz per
@@ -29,6 +32,8 @@ export function LiveScreen({ stream, socket, onFinished }: LiveScreenProps) {
   const [phase, setPhase] = useState('IDLE')
   const [elbowAngle, setElbowAngle] = useState<number | null>(null)
   const [muted, setMuted] = useState(loadMuted)
+  const [stopping, setStopping] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   // The message listener is set up once; it reads the live choice from a ref.
   const silent = useRef(muted)
   useEffect(() => {
@@ -66,12 +71,35 @@ export function LiveScreen({ stream, socket, onFinished }: LiveScreenProps) {
         navigator.vibrate?.(VIBRATE_MS)
         return
       }
-      if (message.type === 'summary') onFinished(message)
+      if (message.type === 'summary') {
+        onFinished(message)
+        return
+      }
+      if (message.type === 'error') setNotice(message.message)
     })
 
     socket.start(newSetId())
     return stopListening
   }, [socket, onFinished])
+
+  useEffect(() => {
+    if (notice === null) return
+    const clearing = setTimeout(() => setNotice(null), NOTICE_MS)
+    return () => clearTimeout(clearing)
+  }, [notice])
+
+  /** Abandon this Set and begin another straight away, on the same Connection. */
+  const restart = () => {
+    socket.reset()
+    socket.start(newSetId())
+    setReps(0)
+    setRejected(0)
+  }
+
+  const stop = () => {
+    setStopping(true)
+    socket.stop()
+  }
 
   const toggleMute = () => {
     const next = !muted
@@ -94,16 +122,21 @@ export function LiveScreen({ stream, socket, onFinished }: LiveScreenProps) {
         </p>
         <p className="tally">{rejected} rejected</p>
         <p className="readout">{readout(phase, elbowAngle)}</p>
+        {notice !== null && (
+          <p role="status" className="notice">
+            {notice}
+          </p>
+        )}
       </div>
 
       <div className="guide">
         <button type="button" onClick={toggleMute} aria-pressed={muted}>
           {muted ? 'Unmute' : 'Mute'}
         </button>
-        <button type="button" onClick={() => socket.reset()}>
+        <button type="button" onClick={restart}>
           Reset
         </button>
-        <button type="button" onClick={() => socket.stop()}>
+        <button type="button" onClick={stop} disabled={stopping}>
           Stop
         </button>
       </div>

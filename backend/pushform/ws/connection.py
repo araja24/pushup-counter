@@ -99,7 +99,7 @@ class Connection:
 
     def _stop(self) -> list[dict]:
         if self._set_id is None:
-            return [error("malformed", "No Set is running.")]
+            return [error("no_active_set", "No Set is running.")]
         summaries = [event for event in self._orchestrator.stop() if isinstance(event, Summary)]
         self._set_id = None
         self._begin_preview()
@@ -107,6 +107,8 @@ class Connection:
 
     def _reset(self) -> list[dict]:
         """Discard the Set in progress. No Summary: a reset Set never happened."""
+        if self._set_id is None:
+            return [error("no_active_set", "No Set is running.")]
         self._set_id = None
         self._begin_preview()
         return [self._forced_state()]

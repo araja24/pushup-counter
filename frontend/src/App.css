@@ -183,3 +183,14 @@ button:disabled {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.notice {
+  position: absolute;
+  inset: auto 1rem 4.5rem 1rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  color: #ff9c8f;
+  background: rgb(14 20 18 / 85%);
+}
