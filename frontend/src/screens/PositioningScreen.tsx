@@ -16,8 +16,7 @@ interface PositioningScreenProps {
 
 /**
  * The mirrored preview with the skeleton over it, plus the guide that tells the
- * user what is not in frame yet. Start is available from first paint; the guard
- * only drives the guide copy.
+ * user what is not in frame yet. Start unlocks only once the guard passes.
  */
 export function PositioningScreen({ stream, socket, onStart }: PositioningScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -59,7 +58,7 @@ export function PositioningScreen({ stream, socket, onStart }: PositioningScreen
         <button
           type="button"
           className="guide__start"
-          disabled={phase === 'failed'}
+          disabled={!guard.ready}
           onClick={() => onStart(stream)}
         >
           Start
