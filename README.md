@@ -11,6 +11,11 @@ cd backend  && uv sync && uv run uvicorn pushform.app:app --reload   # API on :8
 cd frontend && npm install && npm run dev                            # UI  on :5173
 ```
 
+Both are needed: the page derives its API and WebSocket URLs from its own origin, so the
+dev server forwards `/api` and `/ws` to the backend on `:8000` (set `PUSHFORM_BACKEND` to
+point elsewhere). **Without the backend running, the camera and skeleton still work but the
+counter never advances**, because reps are counted server-side.
+
 The backend serves `frontend/dist` at `/` once you have run `npm run build`; until then
 `/` returns a placeholder page. `GET /api/health` and `GET /api/config` are always live,
 and the OpenAPI docs are at `/docs`.
